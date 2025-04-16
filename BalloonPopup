@@ -1,0 +1,167 @@
+<script setup>
+import {ref, onMounted, watch} from 'vue'
+
+const props = defineProps({
+  event: {
+    type: String,
+    default: 'mounted' // mounted | idle | leave
+  },
+  second: {
+    type: Number,
+    default: 3000
+  },
+  imageUrl: String
+})
+
+const internalEvent = ref(props.event)
+
+// Balloon position
+const balloonX = ref(null)
+const balloonY = ref(null)
+
+const dragging = ref(false)
+const offsetX = ref(0)
+const offsetY = ref(0)
+
+onMounted(() => {
+  if (window.innerWidth <= 768) {
+    // Mobile
+    balloonX.value = 78
+    balloonY.value = 50
+  } else {
+    // Desktop
+    balloonX.value = 92
+    balloonY.value = 50
+  }
+
+  if (props.event === 'mounted') {
+    setTimeout(() => {
+      internalEvent.value = 'idle'
+    }, props.second)
+  } else if (props.event === 'idle') {
+    internalEvent.value = 'idle'
+  }
+})
+
+watch(() => props.event, (newVal) => {
+  internalEvent.value = newVal
+})
+
+function handleLeave() {
+  internalEvent.value = 'leave'
+}
+
+function handleClose() {
+  internalEvent.value = 'close'
+}
+
+
+function startDrag(e) {
+  dragging.value = true
+  const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX
+  const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY
+
+  offsetX.value = clientX
+  offsetY.value = clientY
+
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', stopDrag)
+
+  window.addEventListener('touchmove', onDrag, { passive: false })
+  window.addEventListener('touchend', stopDrag)
+}
+
+function onDrag(e) {
+  if (!dragging.value) return
+
+  const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX
+  const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY
+
+  const deltaX = clientX - offsetX.value
+  const deltaY = clientY - offsetY.value
+
+  balloonX.value += (deltaX / window.innerWidth) * 100
+  balloonY.value += (deltaY / window.innerHeight) * 100
+
+  offsetX.value = clientX
+  offsetY.value = clientY
+
+  if (e.type === 'touchmove') {
+    e.preventDefault()
+  }
+}
+
+function stopDrag() {
+  dragging.value = false
+
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', stopDrag)
+  window.removeEventListener('touchmove', onDrag)
+  window.removeEventListener('touchend', stopDrag)
+}
+
+
+</script>
+
+<template>
+  <transition name="fade">
+    <div
+        v-if="internalEvent === 'idle'"
+        class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+    >
+      <div class="relative bg-transparent rounded-lg overflow-hidden max-w-md w-full">
+        <button
+            @click="handleClose"
+            class="absolute top-1 right-1 text-black text-2xl bg-white/30 hover:bg-white/50 rounded-full w-8 h-8 flex items-center justify-center"
+        >
+          &times;
+        </button>
+
+        <div class="p-4 mt-7 text-center">
+          <img :src="imageUrl" class="mx-auto" />
+<!--          <component-->
+<!--            v-for="item in items"-->
+<!--            :is="item.type"-->
+<!--            :key="item.key"-->
+<!--            :="item"-->
+<!--          />-->
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div
+        v-if="internalEvent === 'close'"
+        class="fixed z-50 cursor-move"
+        :style="{ top: `${balloonY}vh`, left: `${balloonX}vw` }"
+        @mousedown="startDrag"
+        @touchstart="startDrag"
+    >
+      <div class="relative bg-white rounded-lg shadow-xl w-[70px] md:w-[90px] h-[70px] md:h-[90px] overflow-hidden">
+        <button
+            @click="handleLeave"
+            class="absolute top-1 right-1 z-10 text-black text-xl bg-white/80 hover:bg-white rounded-full w-6 h-6 flex items-center justify-center"
+        >
+          &times;
+        </button>
+        <img :src="imageUrl" alt="Banner" class="w-full h-full object-cover pointer-events-none" />
+<!--        <component-->
+<!--            v-for="item in items"-->
+<!--            :is="item.type"-->
+<!--            :key="item.key"-->
+<!--            :="item"-->
+<!--        />-->
+      </div>
+    </div>
+  </transition>
+</template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+</style>
